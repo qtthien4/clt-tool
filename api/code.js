@@ -10,11 +10,12 @@ const {
 const dayjs = require("dayjs");
 const cheerio = require("cheerio");
 
+
 const s3Client = new S3Client({
   region: "ap-southeast-1",
   credentials: {
-    accessKeyId: process.env.ACCESS_KEY_ID,
-    secretAccessKey: process.env.SECRET_ACCESS_KEY,
+    accessKeyId: process.env.ACCESS_KEY_ID!,
+    secretAccessKey: process.env.SECRET_ACCESS_KEY!,
   },
 });
 
@@ -229,6 +230,7 @@ module.exports.getKeyOnS3 = async () => {
 
     return "";
   } catch (error) {
+    console.log(error);
     throw new Error(error);
   }
 };
