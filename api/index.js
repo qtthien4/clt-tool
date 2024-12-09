@@ -1,5 +1,11 @@
 const express = require("express");
-const { loginBluePrint } = require("./code");
+const {
+  loginBluePrint,
+  getKeyOnS3,
+  checkKey,
+  upKeyOnS3,
+  checkTimeWork,
+} = require("./code");
 const app = express();
 
 app.get("/", (req, res) => {
@@ -7,8 +13,19 @@ app.get("/", (req, res) => {
 });
 
 app.get("/check-login", async (req, res) => {
-  const key = await loginBluePrint();
-  res.send(key);
+  let key = await getKeyOnS3();
+  if (!key) {
+    throw new Error("can't get key");
+  }
+
+  const checkKeyExpire = await checkKey(key);
+
+  if (!checkKeyExpire) {
+    key = await loginBluePrint();
+    await upKeyOnS3(key);
+  }
+  await checkTimeWork(key);
+  res.status(200).send("success!");
 });
 
 app.listen(3001, () => console.log("Server ready on port 3001."));

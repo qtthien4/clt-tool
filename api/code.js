@@ -1,4 +1,24 @@
-export const loginBluePrint = async () => {
+const querystring = require("querystring");
+// const fetch = (...args) => import("node-fetch").then(({ default: fetch }) => fetch(...args));
+
+const {
+  S3Client,
+  GetObjectCommand,
+  DeleteObjectsCommand,
+  PutObjectCommand,
+} = require("@aws-sdk/client-s3");
+const dayjs = require("dayjs");
+const cheerio = require("cheerio");
+
+const s3Client = new S3Client({
+  region: "ap-southeast-1",
+  credentials: {
+    accessKeyId: process.env.ACCESS_KEY_ID,
+    secretAccessKey: process.env.SECRET_ACCESS_KEY,
+  },
+});
+
+module.exports.loginBluePrint = async () => {
   let JSESSIONID;
   let OAuthToken;
   let location;
@@ -49,8 +69,8 @@ export const loginBluePrint = async () => {
   }
 
   const data = {
-    username: "thienvq",
-    password: "Thien!@#",
+    username: process.env.USERNAME,
+    password: process.env.PASSWORD,
     rememberMe: "on",
   };
   const formBody = querystring.stringify(data);
@@ -88,7 +108,7 @@ export const loginBluePrint = async () => {
   return JSESSIONID;
 };
 
-export const checkTimeWork = async JSESSIONID => {
+module.exports.checkTimeWork = async JSESSIONID => {
   const today = dayjs().format("DD");
   const payloadTimeWork = {
     wrkDt: dayjs().startOf("month").format("YYYYMMDD"),
@@ -114,76 +134,117 @@ export const checkTimeWork = async JSESSIONID => {
     today - 1
   ];
 
-  console.log(timeWork);
+  console.log("timeWork", timeWork);
 
-  if (timeWork?.atndTms == null) {
-    fetch("https://blueprint.cyberlogitec.com.vn/api/checkInOut/insert", {
-      headers: {
-        cookie: `JSESSIONID=${JSESSIONID};`,
-      },
-      method: "POST",
-    });
+  const randomMinutes = Math.floor(Math.random() * 6) + 1;
+  console.log(randomMinutes);
 
-    console.log(`đã checkin lúc ${dayjs().format("DD/MM/YYYY HH:mm:ss")}`);
-    return;
-  }
-  //check luc 17:40
-  if (timeWork?.lveTms == null || Number(timeWork?.lveTms) < 1750) {
-    console.log("bắt đầu checkout");
-    const res = await fetch(
-      "https://blueprint.cyberlogitec.com.vn/api/checkInOut/insert",
-      {
-        headers: {
-          cookie: `JSESSIONID=${JSESSIONID};`,
-        },
-        method: "POST",
+  setTimeout(async () => {
+    if (timeWork?.atndTms == null) {
+      const res = await fetch(
+        "https://blueprint.cyberlogitec.com.vn/api/checkInOut/insert",
+        {
+          headers: {
+            cookie: `JSESSIONID=${JSESSIONID};`,
+          },
+          method: "POST",
+        }
+      );
+
+      if (res.ok) {
+        console.log(`đã checkin lúc ${dayjs().format("DD/MM/YYYY HH:mm:ss")}`);
+      } else {
+        console.log(res);
       }
-    );
-
-    if (res.ok) {
-      console.log(`đã checkout lúc ${dayjs().format("DD/MM/YYYY HH:mm:ss")}`);
-    } else {
-      console.log(res.status);
+      return;
     }
-    return;
+
+    if (timeWork?.lveTms == null || Number(timeWork?.lveTms) < 1750) {
+      const res = await fetch(
+        "https://blueprint.cyberlogitec.com.vn/api/checkInOut/insert",
+        {
+          headers: {
+            cookie: `JSESSIONID=${JSESSIONID};`,
+          },
+          method: "POST",
+        }
+      );
+
+      if (res.ok) {
+        console.log(`đã checkout lúc ${dayjs().format("DD/MM/YYYY HH:mm:ss")}`);
+      } else {
+        console.log(res);
+      }
+      return;
+    }
+  }, randomMinutes * 58 * 1000);
+};
+
+module.exports.upKeyOnS3 = async body => {
+  const keyName = "key_login_clv.txt";
+  const bucketName = "s3-clv-login";
+
+  const inputDelete = {
+    Bucket: bucketName,
+    Delete: {
+      Objects: [
+        {
+          Key: keyName,
+        },
+      ],
+    },
+  };
+  //delete before upload new file
+  const command = new DeleteObjectsCommand(inputDelete);
+  await s3Client.send(command);
+
+  //upload new file
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: bucketName,
+      Body: body,
+      Key: keyName,
+      ContentType: "text/plain",
+    })
+  );
+  console.log(` uploaded successfully.`);
+};
+
+module.exports.getKeyOnS3 = async () => {
+  const keyName = "key_login_clv.txt";
+  const bucketName = "s3-clv-login";
+
+  try {
+    const response = await s3Client.send(
+      new GetObjectCommand({
+        Bucket: bucketName,
+        Key: keyName,
+        ContentType: "text/plain",
+      })
+    );
+    if (response.Body) {
+      const str = await response.Body.transformToString();
+      return str;
+    }
+
+    return "";
+  } catch (error) {
+    throw new Error(error);
   }
 };
 
-export const getKeyOnS3 = async () => {
-  const bucketName = "s3-clv-login";
-  const keyName = "key_login_clv.txt";
-  const key = await loginBluePrint();
-  const params = {
-    Bucket: bucketName,
-    Key: keyName,
-    Body: key,
-    ContentType: "text/plain",
-  };
-
-  try {
-    s3.deleteObject(params, async function (error, data) {
-      if (error) {
-        console.log("Delete S3 Object error: ", error.stack);
-      } else {
-        console.log(keyName, " delete success");
-      }
-    });
-  } catch (error) {
-    console.log(error);
-  }
-  try {
-    // Upload file lên S3
-    const data = await s3.putObject(params).promise();
-    console.log("Successfully uploaded data to", bucketName, keyName);
-    return {
-      statusCode: 200,
-      body: JSON.stringify("Upload successful!"),
-    };
-  } catch (error) {
-    console.error("Error uploading file:", error);
-    return {
-      statusCode: 500,
-      body: JSON.stringify("Upload failed!"),
-    };
-  }
+module.exports.checkKey = async JSESSIONID => {
+  const response = await fetch(
+    "https://blueprint.cyberlogitec.com.vn/api/getUserInfo",
+    {
+      redirect: "manual",
+      referrerPolicy: "no-referrer",
+      headers: {
+        cookie: `JSESSIONID=${JSESSIONID}`,
+      },
+    }
+  ).then(e => e.json());
+  if (response.usrEml) {
+    return true;
+  } else return false;
 };
