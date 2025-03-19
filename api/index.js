@@ -30,4 +30,4 @@ app.get("/check-login", async (req, res) => {
 
 app.listen(3000, () => console.log("Server ready on port 3000."));
 
-exports.myFunction = app;
+module.exports = app;

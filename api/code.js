@@ -24,7 +24,7 @@ const timeout = process.env.TIMEOUT;
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-export const loginBluePrint = async () => {
+module.exports.loginBluePrint = async () => {
   let JSESSIONID;
   let OAuthToken;
   let location;
@@ -114,7 +114,7 @@ export const loginBluePrint = async () => {
   return JSESSIONID;
 };
 
-export const checkTimeWork = async JSESSIONID => {
+module.exports.checkTimeWork = async JSESSIONID => {
   const randomMinutes = Math.floor(Math.random() * timeout || 5) + 1;
   // const today = dayjs().format("DD");
   // const payloadTimeWork = {
@@ -167,7 +167,7 @@ export const checkTimeWork = async JSESSIONID => {
   }, randomMinutes * 59 * 1000);
 };
 
-export const upKeyOnS3 = async body => {
+module.exports.upKeyOnS3 = async body => {
   const keyName = "key_login_clv.txt";
   const bucketName = "s3-clv-login";
 
@@ -197,7 +197,7 @@ export const upKeyOnS3 = async body => {
   console.log(`uploaded successfully.`);
 };
 
-export const getKeyOnS3 = async () => {
+module.exports.getKeyOnS3 = async () => {
   const keyName = "key_login_clv.txt";
   const bucketName = "s3-clv-login";
 
@@ -221,7 +221,7 @@ export const getKeyOnS3 = async () => {
   }
 };
 
-export const checkKey = async JSESSIONID => {
+module.exports.checkKey = async JSESSIONID => {
   const response = await fetch(
     "https://blueprint.cyberlogitec.com.vn/api/getUserInfo",
     {
